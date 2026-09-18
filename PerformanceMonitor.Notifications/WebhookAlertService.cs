@@ -1737,9 +1737,12 @@ public class WebhookAlertService
     }
 
     /// <summary>
-    /// Builds a PagerDuty Events API v2 payload. Always sends event_action: "trigger" (no resolve wiring —
-    /// matches Teams/Slack/Generic which also don't deliver "Cleared" notifications). The dedup_key correlates
-    /// repeated triggers for the same ongoing incident into one PagerDuty alert.
+    /// Builds a PagerDuty Events API v2 payload. Firing conditions send event_action: "trigger"; resolution
+    /// notices (the shared severity map's RESOLVED tier — "Server Restored", "AG Replica Reconnected") send
+    /// "resolve" with the SAME dedup_key, so the restore closes the incident its trigger opened instead of
+    /// arriving as a second trigger. Teams/Slack/Generic still deliver no "Cleared" notifications — this is
+    /// PagerDuty's own incident lifecycle. The dedup_key correlates repeated triggers for the same ongoing
+    /// incident into one PagerDuty alert.
     /// <para>#2710: a non-null <paramref name="triageUrl"/> rides in BOTH the Events v2 <c>links</c> array
     /// (which PD renders as a first-class link on the alert) and <c>custom_details["Triage"]</c> (so an
     /// integration reading only the details table still gets it). Null renders the pre-#2710 payload — no
@@ -1772,6 +1775,11 @@ public class WebhookAlertService
         var titleName = string.IsNullOrEmpty(displayName) ? metricName : displayName;
         var utcNow = nowUtc ?? DateTime.UtcNow;
 
+        /* Resolution notices close the incident their trigger opened, so PagerDuty gets
+           event_action "resolve" with the SAME dedup_key. Test notifications always trigger
+           (they carry a throwaway key and have no incident to resolve). */
+        var eventAction = isTest || !IsResolutionBadge(badgeText) ? "trigger" : "resolve";
+
         /* PD-CEF caps summary at 1024 chars — no truncation needed given the source strings, but document
            the constraint matching this codebase's habit of documenting limits even when unreachable. */
         var summary = isTest
@@ -1796,7 +1804,7 @@ public class WebhookAlertService
         var payload = new Dictionary<string, object>
         {
             ["routing_key"] = routingKey,
-            ["event_action"] = "trigger",
+            ["event_action"] = eventAction,
             ["dedup_key"] = effectiveDedupKey,
             ["payload"] = new
             {
@@ -1832,6 +1840,15 @@ public class WebhookAlertService
             _ => "info"
         };
     }
+
+    /// <summary>
+    /// True when the shared severity map's badge tier marks a resolution (the "RESOLVED" tier:
+    /// "Server Restored", "AG Replica Reconnected"). PagerDuty Events API v2 gets
+    /// <c>event_action: "resolve"</c> for these, so the matching dedup_key closes the incident
+    /// instead of the restore arriving as a second trigger.
+    /// </summary>
+    private static bool IsResolutionBadge(string badgeText) =>
+        string.Equals(badgeText, "RESOLVED", StringComparison.Ordinal);
 
     /// <summary>
     /// Builds the custom_details object for the PagerDuty payload. Flattens context details the same way
@@ -1909,6 +1926,13 @@ public class WebhookAlertService
     /// Derives the PagerDuty dedup_key from the same fingerprint the cooldown uses, so repeated alerts for
     /// the same ongoing incident correlate into one PagerDuty alert. Falls back to a stable metric+server
     /// key when there is no incident (mirrors the cooldown's own "no incidents → metric-level fallback key" rule).
+    ///
+    /// <para>The connection edges ("Server Unreachable" / "Server Restored") are two halves of ONE incident,
+    /// so they deliberately share a single condition key instead of keying on the metric name. The metric
+    /// name encodes the current STATE, so using it minted a distinct dedup_key per edge and PagerDuty showed
+    /// two incidents for one outage. All three consumers of this helper (PagerDuty, the generic
+    /// <c>{{dedup_key}}</c> token, and the triage link) share the normalized key by construction, which is
+    /// the cross-channel correlation those call sites document.</para>
     /// </summary>
     private static string DerivePagerDutyDedupKey(string serverId, string metricName, AlertContext? context)
     {
@@ -1923,10 +1947,22 @@ public class WebhookAlertService
                 return firstKey;
         }
 
+        /* Connection edges: one incident identity regardless of which edge is notifying. */
+        if (IsConnectionEdgeMetric(metricName))
+            return $"{serverId}:{ConnectionIncidentKey}";
+
         /* No incident or blank key: fall back to a stable metric+server key, matching the cooldown's
            own fallback shape (without the "webhook:" prefix — PagerDuty's dedup_key is its own namespace). */
         return $"{serverId}:{metricName}";
     }
+
+    /* Both connection edges are halves of one incident, so they must share a dedup_key; the metric
+       name ("Server Unreachable" / "Server Restored") encodes the state and would otherwise mint a
+       new key per edge (two PagerDuty incidents for one outage). */
+    private const string ConnectionIncidentKey = "ServerConnection";
+
+    private static bool IsConnectionEdgeMetric(string metricName) =>
+        metricName is "Server Unreachable" or "Server Restored";
 
     private static string PagerDutyEndpoint(bool useEuRegion) =>
         useEuRegion ? "https://events.eu.pagerduty.com/v2/enqueue" : "https://events.pagerduty.com/v2/enqueue";

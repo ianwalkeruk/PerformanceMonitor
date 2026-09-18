@@ -136,6 +136,51 @@ public class PagerDutyWebhookTests
         Assert.Equal(root1.GetProperty("dedup_key").GetString(), root2.GetProperty("dedup_key").GetString());
     }
 
+    [Fact]
+    public void BuildPagerDutyPayload_ConnectionEdges_ShareOneDedupKey()
+    {
+        /* "Server Unreachable" and "Server Restored" are two halves of one incident. Keying on the
+           metric name minted a distinct dedup_key per edge, so PagerDuty showed two incidents. */
+        var unreachable = WebhookAlertService.BuildPagerDutyPayload(
+            "Server Unreachable", "SRV1", "Login timeout expired", "Online",
+            Branding, "key", serverId: "261742202");
+        var restored = WebhookAlertService.BuildPagerDutyPayload(
+            "Server Restored", "SRV1", "Online", "Online",
+            Branding, "key", serverId: "261742202");
+
+        var unreachableKey = JsonDocument.Parse(unreachable).RootElement.GetProperty("dedup_key").GetString();
+        var restoredKey = JsonDocument.Parse(restored).RootElement.GetProperty("dedup_key").GetString();
+
+        Assert.Equal("261742202:ServerConnection", unreachableKey);
+        Assert.Equal(unreachableKey, restoredKey);
+    }
+
+    [Fact]
+    public void BuildPagerDutyPayload_ConnectionEdges_TriggerThenResolve()
+    {
+        var unreachable = WebhookAlertService.BuildPagerDutyPayload(
+            "Server Unreachable", "SRV1", "Login timeout expired", "Online",
+            Branding, "key", serverId: "261742202");
+        var restored = WebhookAlertService.BuildPagerDutyPayload(
+            "Server Restored", "SRV1", "Online", "Online",
+            Branding, "key", serverId: "261742202");
+
+        Assert.Equal("trigger", JsonDocument.Parse(unreachable).RootElement.GetProperty("event_action").GetString());
+        Assert.Equal("resolve", JsonDocument.Parse(restored).RootElement.GetProperty("event_action").GetString());
+    }
+
+    [Fact]
+    public void BuildPagerDutyPayload_NonConnectionMetric_StillTriggersWithMetricKey()
+    {
+        var payload = WebhookAlertService.BuildPagerDutyPayload(
+            "High CPU", "SRV1", "95%", "90%", Branding, "key", serverId: "261742202");
+
+        var root = JsonDocument.Parse(payload).RootElement;
+
+        Assert.Equal("trigger", root.GetProperty("event_action").GetString());
+        Assert.Equal("261742202:High CPU", root.GetProperty("dedup_key").GetString());
+    }
+
     /* ---------------- Custom details (T-SQL hint) ---------------- */
 
     [Fact]
