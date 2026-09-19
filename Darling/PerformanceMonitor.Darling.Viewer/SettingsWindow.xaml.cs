@@ -1232,6 +1232,7 @@ public partial class SettingsWindow : Window
         PagerDutyWebhookEnabledCheckBox.IsChecked = !string.IsNullOrWhiteSpace(r.PagerDutyRoutingKey);
         PagerDutyRoutingKeyBox.Text = r.PagerDutyRoutingKey;
         PagerDutyEuRegionCheckBox.IsChecked = r.PagerDutyUseEuRegion;
+        PagerDutyAutoResolveCheckBox.IsChecked = r.PagerDutyAutoResolve;
         PagerDutyProxyAddressBox.Text = r.PagerDutyProxy;
 
         UpdateSmtpControlStates();
@@ -1302,6 +1303,7 @@ public partial class SettingsWindow : Window
         {
             row.PagerDutyRoutingKey = PagerDutyRoutingKeyBox.Text?.Trim() ?? "";
             row.PagerDutyUseEuRegion = PagerDutyEuRegionCheckBox.IsChecked == true;
+            row.PagerDutyAutoResolve = PagerDutyAutoResolveCheckBox.IsChecked == true;
             row.PagerDutyProxy = PagerDutyProxyAddressBox.Text?.Trim() ?? "";
         }
 
@@ -1431,6 +1433,7 @@ public partial class SettingsWindow : Window
         var enabled = PagerDutyWebhookEnabledCheckBox.IsChecked == true;
         PagerDutyRoutingKeyBox.IsEnabled = enabled;
         PagerDutyEuRegionCheckBox.IsEnabled = enabled;
+        PagerDutyAutoResolveCheckBox.IsEnabled = enabled;
         PagerDutyProxyAddressBox.IsEnabled = enabled;
         TestPagerDutyButton.IsEnabled = enabled;
     }
@@ -1762,6 +1765,7 @@ public partial class SettingsWindow : Window
         public bool PagerDutyEnabled { get; private init; }
         public string PagerDutyRoutingKey { get; private init; } = "";
         public bool PagerDutyUseEuRegion { get; private init; }
+        public bool PagerDutyAutoResolve { get; private init; }
         public string PagerDutyProxyAddress { get; private init; } = "";
 
         public double AnalysisNotifySeverity { get; private init; }

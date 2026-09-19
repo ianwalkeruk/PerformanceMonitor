@@ -199,6 +199,7 @@ public static class PgMigrations
         new Migration(124, "fleet-sweep-cadence-knobs", V124Sql),
         new Migration(125, "collector-database-scope", V125Sql),
         new Migration(126, "self-disk-warn-gb-floor", V126Sql),
+        new Migration(127, "pagerduty-auto-resolve", V127Sql),
     };
 
     /// <summary>
@@ -1360,6 +1361,18 @@ ALTER TABLE config.config_notification
     private const string V43Sql = @"
 ALTER TABLE config.config_notification
     ADD COLUMN IF NOT EXISTS pagerduty_proxy text NOT NULL DEFAULT '';";
+
+    /// <summary>
+    /// V127 — the PagerDuty auto-resolve opt-in. Adds <c>pagerduty_auto_resolve</c> to
+    /// <c>config.config_notification</c>: non-null with a FALSE default, so every existing row keeps the
+    /// shipped behaviour of NOT auto-resolving incidents with PagerDuty. Non-secret (it is a behaviour
+    /// toggle, not a credential), so unlike the routing key beside it, it stays in the read-only viewer
+    /// role's SELECT grant — <c>DarlingManagedRoles.ViewerRestrictedConfigTables</c> and
+    /// <c>Darling/tools/provision-roles.sql</c>.
+    /// </summary>
+    private const string V127Sql = @"
+ALTER TABLE config.config_notification
+    ADD COLUMN IF NOT EXISTS pagerduty_auto_resolve boolean NOT NULL DEFAULT FALSE;";
 
     /// <summary>
     /// V44 — per-server collector state that is NOT derivable from the collected rows, so it cannot be a

@@ -156,17 +156,39 @@ public class PagerDutyWebhookTests
     }
 
     [Fact]
-    public void BuildPagerDutyPayload_ConnectionEdges_TriggerThenResolve()
+    public void BuildPagerDutyPayload_ConnectionRestore_TriggersAtInfo_UnlessAutoResolveIsOn()
     {
-        var unreachable = WebhookAlertService.BuildPagerDutyPayload(
-            "Server Unreachable", "SRV1", "Login timeout expired", "Online",
-            Branding, "key", serverId: "261742202");
-        var restored = WebhookAlertService.BuildPagerDutyPayload(
+        /* Default: no auto-resolve. The recovery is an info-level trigger on the shared connection key, so
+           the incident stays open — the tool does not auto-resolve third-party incidents unasked. */
+        var defaultRestore = WebhookAlertService.BuildPagerDutyPayload(
             "Server Restored", "SRV1", "Online", "Online",
             Branding, "key", serverId: "261742202");
 
-        Assert.Equal("trigger", JsonDocument.Parse(unreachable).RootElement.GetProperty("event_action").GetString());
-        Assert.Equal("resolve", JsonDocument.Parse(restored).RootElement.GetProperty("event_action").GetString());
+        var defaultRoot = JsonDocument.Parse(defaultRestore).RootElement;
+        Assert.Equal("trigger", defaultRoot.GetProperty("event_action").GetString());
+        Assert.Equal("info", defaultRoot.GetProperty("payload").GetProperty("severity").GetString());
+        Assert.Equal("261742202:ServerConnection", defaultRoot.GetProperty("dedup_key").GetString());
+
+        /* Opted in: the recovery resolves the incident its "Server Unreachable" trigger opened. */
+        var resolved = WebhookAlertService.BuildPagerDutyPayload(
+            "Server Restored", "SRV1", "Online", "Online",
+            Branding, "key", serverId: "261742202", autoResolve: true);
+
+        var resolvedRoot = JsonDocument.Parse(resolved).RootElement;
+        Assert.Equal("resolve", resolvedRoot.GetProperty("event_action").GetString());
+        Assert.Equal("261742202:ServerConnection", resolvedRoot.GetProperty("dedup_key").GetString());
+    }
+
+    [Fact]
+    public void BuildPagerDutyPayload_AutoResolve_DoesNotResolveNonConnectionNotices()
+    {
+        /* Scoped to the connection edge: a different RESOLVED notice keeps triggering even when the
+           operator has opted into auto-resolve. */
+        var payload = WebhookAlertService.BuildPagerDutyPayload(
+            "AG Replica Reconnected", "SRV1", "Online", "Online",
+            Branding, "key", serverId: "261742202", autoResolve: true);
+
+        Assert.Equal("trigger", JsonDocument.Parse(payload).RootElement.GetProperty("event_action").GetString());
     }
 
     [Fact]
@@ -447,6 +469,7 @@ public class PagerDutyWebhookTests
         public bool PagerDutyEnabled { get; set; }
         public string PagerDutyRoutingKey { get; set; } = "";
         public bool PagerDutyUseEuRegion { get; set; }
+        public bool PagerDutyAutoResolve { get; set; }
         public string PagerDutyProxyAddress => "";
         public double AnalysisNotifySeverity => 1.5;
         public int AnalysisNotifyCooldownMinutes => 360;

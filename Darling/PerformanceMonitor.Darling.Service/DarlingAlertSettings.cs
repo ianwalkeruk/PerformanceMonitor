@@ -324,6 +324,7 @@ public sealed class DarlingAlertSettings : IAlertEngineSettings, IAlertSettings
     public string PagerDutyRoutingKey => _config.Webhooks.PagerDutyRoutingKey;
     public bool PagerDutyUseEuRegion => _config.Webhooks.PagerDutyUseEuRegion;
     public string PagerDutyProxyAddress => _config.Webhooks.PagerDutyProxy;
+    public bool PagerDutyAutoResolve => _config.Webhooks.PagerDutyAutoResolve;
 
     /* Scheduled-analysis notifications (AN3): the shared AnalysisNotificationService's severity floor
        + per-finding re-notify cooldown. The severity floor is now a control-plane knob (config Stage

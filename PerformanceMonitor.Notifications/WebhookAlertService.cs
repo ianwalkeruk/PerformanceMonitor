@@ -1701,7 +1701,8 @@ public class WebhookAlertService
             var payload = BuildPagerDutyPayload(
                 metricName, serverName, currentValue, thresholdValue, _branding,
                 _settings.PagerDutyRoutingKey, context: context, dedupKey: dedupKey, triageUrl: triageUrl,
-                detailText: detailText, displayName: displayName, nowUtc: nowUtc);
+                detailText: detailText, displayName: displayName, nowUtc: nowUtc,
+                autoResolve: _settings.PagerDutyAutoResolve);
 
             var endpoint = PagerDutyEndpoint(_settings.PagerDutyUseEuRegion);
             var error = await PostWebhookAsync(endpoint, payload, _settings.PagerDutyProxyAddress);
@@ -1737,12 +1738,12 @@ public class WebhookAlertService
     }
 
     /// <summary>
-    /// Builds a PagerDuty Events API v2 payload. Firing conditions send event_action: "trigger"; resolution
-    /// notices (the shared severity map's RESOLVED tier — "Server Restored", "AG Replica Reconnected") send
-    /// "resolve" with the SAME dedup_key, so the restore closes the incident its trigger opened instead of
-    /// arriving as a second trigger. Teams/Slack/Generic still deliver no "Cleared" notifications — this is
-    /// PagerDuty's own incident lifecycle. The dedup_key correlates repeated triggers for the same ongoing
-    /// incident into one PagerDuty alert.
+    /// Builds a PagerDuty Events API v2 payload. Firing conditions send event_action: "trigger". A connection
+    /// recovery ("Server Restored") sends "resolve" ONLY when <paramref name="autoResolve"/> is set — an
+    /// opt-in, PagerDuty-only auto-close of the incident its "Server Unreachable" trigger opened — otherwise
+    /// it is an info-severity trigger on the same dedup_key and the incident stays open. Teams/Slack/Generic
+    /// still deliver no "Cleared" notifications; this is PagerDuty's own incident lifecycle. The dedup_key
+    /// correlates repeated triggers for the same ongoing incident into one PagerDuty alert.
     /// <para>#2710: a non-null <paramref name="triageUrl"/> rides in BOTH the Events v2 <c>links</c> array
     /// (which PD renders as a first-class link on the alert) and <c>custom_details["Triage"]</c> (so an
     /// integration reading only the details table still gets it). Null renders the pre-#2710 payload — no
@@ -1766,7 +1767,8 @@ public class WebhookAlertService
         string? triageUrl = null,
         string? detailText = null,
         string? displayName = null,
-        DateTime? nowUtc = null)
+        DateTime? nowUtc = null,
+        bool autoResolve = false)
     {
         var (_, badgeText, _) = AlertSeverity.ForMetric(metricName, context?.SeverityOverride);
         var severity = MapToPagerDutySeverity(badgeText);
@@ -1775,10 +1777,14 @@ public class WebhookAlertService
         var titleName = string.IsNullOrEmpty(displayName) ? metricName : displayName;
         var utcNow = nowUtc ?? DateTime.UtcNow;
 
-        /* Resolution notices close the incident their trigger opened, so PagerDuty gets
-           event_action "resolve" with the SAME dedup_key. Test notifications always trigger
-           (they carry a throwaway key and have no incident to resolve). */
-        var eventAction = isTest || !IsResolutionBadge(badgeText) ? "trigger" : "resolve";
+        /* Auto-resolve is opt-in and PagerDuty-only: a connection recovery closes the incident its
+           "Server Unreachable" trigger opened, via event_action "resolve" on the SAME dedup_key. Off (the
+           default), the recovery is an info-severity trigger and the incident stays open, so the tool never
+           auto-resolves a third-party incident unasked. Scoped to the connection edge, so other RESOLVED
+           notices ("AG Replica Reconnected") keep triggering. */
+        var eventAction = !isTest && autoResolve && IsResolutionBadge(badgeText) && IsConnectionEdgeMetric(metricName)
+            ? "resolve"
+            : "trigger";
 
         /* PD-CEF caps summary at 1024 chars — no truncation needed given the source strings, but document
            the constraint matching this codebase's habit of documenting limits even when unreachable. */

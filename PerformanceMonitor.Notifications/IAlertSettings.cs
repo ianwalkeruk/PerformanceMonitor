@@ -86,6 +86,15 @@ public interface IAlertSettings
     /// Empty means direct, matching Teams/Slack/Generic.</summary>
     string PagerDutyProxyAddress { get; }
 
+    /// <summary>
+    /// Opt-in, PagerDuty-only: when true, a connection recovery ("Server Restored") is sent as a
+    /// <c>resolve</c> event on the same dedup_key its "Server Unreachable" trigger opened, closing the
+    /// incident. Default false — the tool does not auto-resolve incidents with third parties unless the
+    /// operator asks it to. When false, the recovery is delivered as an info-severity <c>trigger</c> on the
+    /// same dedup_key and the incident stays open. No other channel and no other alert type is affected.
+    /// </summary>
+    bool PagerDutyAutoResolve { get; }
+
     /* Scheduled-analysis notifications */
     double AnalysisNotifySeverity { get; }
     int    AnalysisNotifyCooldownMinutes { get; }

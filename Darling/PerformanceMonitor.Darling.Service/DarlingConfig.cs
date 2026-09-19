@@ -1715,6 +1715,14 @@ public sealed class WebhooksConfig
 
     [JsonPropertyName("pagerDutyProxy")]
     public string PagerDutyProxy { get; set; } = "";
+
+    /// <summary>
+    /// Opt-in, PagerDuty-only: send a <c>resolve</c> when a server recovers, closing the incident its
+    /// "Server Unreachable" trigger opened. Default false — the tool does not auto-resolve incidents with
+    /// third parties unless the operator asks. Non-secret, so it stays in the viewer role's column grant.
+    /// </summary>
+    [JsonPropertyName("pagerDutyAutoResolve")]
+    public bool PagerDutyAutoResolve { get; set; } = false;
 }
 
 public sealed class MonitoredServer

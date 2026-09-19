@@ -1515,7 +1515,7 @@ FROM config_alert_settings WHERE id = 1", connection) { CommandTimeout = Service
 SELECT smtp_host, smtp_port, smtp_use_ssl, smtp_username, smtp_encrypted_password, smtp_from_address,
        smtp_recipients, email_cooldown_minutes, teams_url, teams_proxy, slack_url, slack_proxy,
        generic_url, generic_headers, generic_body_template, generic_proxy,
-       pagerduty_routing_key, pagerduty_use_eu_region, pagerduty_proxy
+       pagerduty_routing_key, pagerduty_use_eu_region, pagerduty_proxy, pagerduty_auto_resolve
 FROM config_notification WHERE id = 1", connection) { CommandTimeout = ServiceCommandDeadlines.SerialLoopSeconds };
         using var reader = await command.ExecuteReaderAsync(ct);
         if (!await reader.ReadAsync(ct))
@@ -1547,6 +1547,7 @@ FROM config_notification WHERE id = 1", connection) { CommandTimeout = ServiceCo
             PagerDutyRoutingKey = reader.GetString(16),
             PagerDutyUseEuRegion = reader.GetBoolean(17),
             PagerDutyProxy = reader.GetString(18),
+            PagerDutyAutoResolve = reader.GetBoolean(19),
         };
         return (smtp, webhooks);
     }

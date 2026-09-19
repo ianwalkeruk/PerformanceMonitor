@@ -28,17 +28,19 @@ namespace Darling.Tests;
 /// deliberately not the target-volume pair's OR, whose GB dimension ADDS fires), so a large volume at a
 /// low percent stays quiet until absolute free space is genuinely short; 0 removes the floor.</para>
 ///
-/// <para>This file carries the "I am the top rung" claims that moved off
-/// <see cref="CollectorDatabaseScopeRungTests"/> (V125) when this rung landed, the same handoff that file
-/// received from <see cref="FleetSweepCadenceKnobRungTests"/> (V124) — a fully-migrated store must map to
-/// EXACTLY this version, or the viewer's connect-time gate refuses a store that is actually current.</para>
+/// <para>The "I am the top rung" claims have moved ON to <see cref="PagerDutyAutoResolveRungTests"/>
+/// (V127), the same handoff this file received from <see cref="CollectorDatabaseScopeRungTests"/> (V125).
+/// What stays here is everything true of this rung wherever it sits in the ladder; what left is every
+/// claim that was really about being NEWEST — keeping a copy of those would assert this rung is still the
+/// top, which is how the NEXT rung's build goes red.</para>
 /// </summary>
 public sealed class SelfDiskWarnGbFloorRungTests
 {
     private const int RungVersion = 126;
     private const int PreviousVersion = 125;
 
-    /// <summary>This rung's sentinel ordinal in the viewer probe — the newest, so the last argument.</summary>
+    /// <summary>This rung's sentinel ordinal in the viewer probe. No longer the last argument — V127
+    /// appended its own — so this is a position within the signature rather than its end.</summary>
     private const int ProbeOrdinal = 101;
 
     private const string FloorColumn = "self_disk_free_warn_gb";
@@ -56,7 +58,11 @@ public sealed class SelfDiskWarnGbFloorRungTests
 
         Assert.Equal(StorageVersion.SchemaVersion, PgMigrations.Scripts[^1].Version);
         Assert.Equal(StorageVersion.SchemaVersion, versions.Max());
-        Assert.Equal(RungVersion, StorageVersion.SchemaVersion);
+
+        /* Not `RungVersion == SchemaVersion` any more: that asserted this rung is the newest, which
+           stopped being true when V127 landed. The invariant that outlives the handoff is that the
+           LADDER's top and the declared version agree, which the two lines above already say. */
+        Assert.True(RungVersion < StorageVersion.SchemaVersion);
 
         Assert.Equal(versions.Distinct().OrderBy(v => v), versions);
     }
@@ -111,15 +117,13 @@ public sealed class SelfDiskWarnGbFloorRungTests
     /* ---- the probe (three sites, top arm) ------------------------------------------------------------- */
 
     /// <summary>
-    /// The viewer probe's three sites carry this rung's sentinel, and the map treats it as the TOP arm.
+    /// The viewer probe's three sites carry this rung's sentinel, and its arm still answers.
     ///
-    /// <para>The probe asks the question, the caller reads the answer, the map has the parameter — three
-    /// sites, and a sentinel present at only some of them shifts every LATER ordinal onto the wrong column.
-    /// Miss all three and a fully-migrated store probes one rung short, so the connect-time gate refuses a
-    /// store that is in fact current — permanently, because no later upgrade changes the answer.</para>
+    /// <para>The top-arm claims (last argument, textual newest-first ordering) moved to
+    /// <see cref="PagerDutyAutoResolveRungTests"/> with the V127 handoff.</para>
     /// </summary>
     [Fact]
-    public void TheProbeMapsAFullyMigratedStoreToThisTopRung()
+    public void TheProbeCarriesThisRungsSentinel_AndAFullyMigratedStoreMapsToTheLaddersTop()
     {
         Assert.Contains($"column_name = '{FloorColumn}'", ViewerDataService.StoreSchemaProbeSql, StringComparison.Ordinal);
 
@@ -133,8 +137,10 @@ public sealed class SelfDiskWarnGbFloorRungTests
             .GetMethod("MapProbedSchemaVersion", BindingFlags.NonPublic | BindingFlags.Static)!;
         var arity = method.GetParameters().Length;
 
-        /* The top rung's sentinel IS the last argument. */
-        Assert.Equal(ProbeOrdinal, arity - 1);
+        /* The ordinal has to be a position that exists, and one that is no longer the last: `arity - 1`
+           asserted this rung is the NEWEST sentinel, which stopped being true the moment V127 appended
+           its own. Strictly-less is the form every other non-top rung's test here uses. */
+        Assert.True(ProbeOrdinal < arity - 1);
 
         /* Every sentinel true = a fully-migrated store, which must map to exactly this version. Built by
            reflection so the arity tracks the signature. */
@@ -152,18 +158,14 @@ public sealed class SelfDiskWarnGbFloorRungTests
         behind[ProbeOrdinal] = false;
         Assert.Equal(PreviousVersion, (int)method.Invoke(null, behind)!);
 
-        /* And in the source, the arm sits ABOVE V125's — newest-first is the whole contract of that method —
-           and returns this build's version rather than a literal that could drift from it. This is the
-           textual half of the top-arm claim, inherited from CollectorDatabaseScopeRungTests the way that
-           file inherited it from FleetSweepCadenceKnobRungTests. */
+        /* And in the source, the arm sits ABOVE V125's — newest-first is the whole contract of that method.
+           The textual top-arm claim (the `return StorageVersion.SchemaVersion` slice) moved to
+           PagerDutyAutoResolveRungTests (V127) with the handoff. */
         var v126 = viewer.IndexOf("if (hasSelfDiskWarnGbFloor)", StringComparison.Ordinal);
         var v125 = viewer.IndexOf("if (hasCollectorScheduleDatabases)", StringComparison.Ordinal);
         Assert.True(v126 >= 0, "the viewer has no V126 sentinel arm — a fully-migrated store would map to 125");
         Assert.True(v125 >= 0, "the V125 arm is gone, so this pin is comparing against nothing");
         Assert.True(v126 < v125, "the V126 arm sits below V125's, so a current store maps one rung low");
-        Assert.Contains(
-            "return " + StorageVersion.SchemaVersion.ToString(CultureInfo.InvariantCulture) + ";",
-            viewer[v126..], StringComparison.Ordinal);
     }
 
     /* ---- every settings-row surface handles the column ------------------------------------------------ */

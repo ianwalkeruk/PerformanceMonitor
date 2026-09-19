@@ -66,6 +66,7 @@ namespace PerformanceMonitorDashboard.Services
         public bool   PagerDutyEnabled      => false;
         public string PagerDutyRoutingKey   => "";
         public bool   PagerDutyUseEuRegion  => false;
+        public bool   PagerDutyAutoResolve  => false;
         public string PagerDutyProxyAddress => "";
 
         public double AnalysisNotifySeverity        => Math.Clamp(_prefs.AnalysisNotifySeverity, 0.0, 2.0);

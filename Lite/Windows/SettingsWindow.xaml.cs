@@ -1177,6 +1177,7 @@ public partial class SettingsWindow : Window
         PagerDutyWebhookEnabledCheckBox.IsChecked = App.PagerDutyWebhookEnabled;
         PagerDutyRoutingKeyBox.Text = App.PagerDutyRoutingKey;
         PagerDutyEuRegionCheckBox.IsChecked = App.PagerDutyUseEuRegion;
+        PagerDutyAutoResolveCheckBox.IsChecked = App.PagerDutyAutoResolve;
         PagerDutyProxyAddressBox.Text = App.PagerDutyProxyAddress;
         UpdateTeamsControlStates();
         UpdateSlackControlStates();
@@ -1223,6 +1224,7 @@ public partial class SettingsWindow : Window
         App.PagerDutyWebhookEnabled = PagerDutyWebhookEnabledCheckBox.IsChecked == true;
         App.PagerDutyRoutingKey = PagerDutyRoutingKeyBox.Text?.Trim() ?? "";
         App.PagerDutyUseEuRegion = PagerDutyEuRegionCheckBox.IsChecked == true;
+        App.PagerDutyAutoResolve = PagerDutyAutoResolveCheckBox.IsChecked == true;
         App.PagerDutyProxyAddress = PagerDutyProxyAddressBox.Text?.Trim() ?? "";
 
         /* Save webhook URLs to Credential Manager instead of settings.json. The generic channel's headers
@@ -1248,6 +1250,7 @@ public partial class SettingsWindow : Window
 
         root["pagerduty_webhook_enabled"] = App.PagerDutyWebhookEnabled;
         root["pagerduty_use_eu_region"] = App.PagerDutyUseEuRegion;
+        root["pagerduty_auto_resolve"] = App.PagerDutyAutoResolve;
         root["pagerduty_proxy_address"] = App.PagerDutyProxyAddress;
 
         /* Remove legacy plaintext webhook URLs from settings.json */
@@ -1325,6 +1328,7 @@ public partial class SettingsWindow : Window
         bool enabled = PagerDutyWebhookEnabledCheckBox.IsChecked == true;
         PagerDutyRoutingKeyBox.IsEnabled = enabled;
         PagerDutyEuRegionCheckBox.IsEnabled = enabled;
+        PagerDutyAutoResolveCheckBox.IsEnabled = enabled;
         PagerDutyProxyAddressBox.IsEnabled = enabled;
         TestPagerDutyButton.IsEnabled = enabled;
     }

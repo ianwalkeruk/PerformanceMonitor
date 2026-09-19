@@ -498,6 +498,7 @@ public sealed class AlertDeliveryChannelTests
         public bool PagerDutyEnabled => _channel == "pagerduty";
         public string PagerDutyRoutingKey => _channel == "pagerduty" ? "routing-key-placeholder" : "";
         public bool PagerDutyUseEuRegion => false;
+        public bool PagerDutyAutoResolve => false;
         public string PagerDutyProxyAddress => "";
 
         public double AnalysisNotifySeverity => 1.5;

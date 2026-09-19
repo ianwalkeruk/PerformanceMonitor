@@ -387,6 +387,7 @@ public class AnalysisProseDeliveryTests
         public bool PagerDutyEnabled => false;
         public string PagerDutyRoutingKey => "";
         public bool PagerDutyUseEuRegion => false;
+        public bool PagerDutyAutoResolve => false;
         public string PagerDutyProxyAddress => "";
 
         public double AnalysisNotifySeverity => NotifyThreshold;
